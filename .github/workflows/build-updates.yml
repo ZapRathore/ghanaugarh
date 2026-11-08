@@ -1,1 +1,33 @@
+name: Build update pages
+
+# Runs whenever you add, change or delete a file in the "updates" folder.
+on:
+  push:
+    paths:
+      - 'updates/**'
+      - 'build-updates.js'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: node build-updates.js
+        env:
+          SITE_URL: https://ghanaugarh.co.in
+      - name: Save generated pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add u
+          if git diff --cached --quiet; then echo "No changes"; else git commit -m "Build update pages" && git push; fi
 
