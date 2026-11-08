@@ -212,7 +212,11 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
 .nb .tw{overflow-x:auto;margin:0 0 12px}
 .nb table{border-collapse:collapse;min-width:100%}
 .nb td,.nb th{border:1px solid var(--stroke);padding:6px 10px;vertical-align:top}
-.news-item .nf{padding:0 18px 14px;font-size:13px}
+.news-item .nf{padding:0 18px 14px;font-size:13px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.nshare{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--stroke);background:var(--bg2);color:var(--ink);border-radius:999px;padding:7px 14px;font:600 13px/1 inherit;font-family:inherit;cursor:pointer}
+.nshare:hover{border-color:var(--accent);color:var(--accent)}
+.nshare[disabled]{opacity:.6;cursor:wait}
+.nshare svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .news-item .nf a{color:var(--accent)}
 .news-msg{border:1px dashed var(--stroke);border-radius:12px;padding:16px;color:var(--muted);font-size:14.5px;line-height:1.6}
 .news-msg small{display:block;margin-top:8px}
@@ -1148,6 +1152,41 @@ function newsMessage(text, small) {
   if (small) { const sm = document.createElement('small'); sm.textContent = small; d.appendChild(sm); }
   l.appendChild(d);
 }
+
+// ---- Share an update: photo + text + link ----
+function siteLink() { return /^https?:$/.test(location.protocol) ? location.href.split('#')[0] : ''; }
+async function newsPhotoBlob(item, box) {
+  try {
+    if (item.kind === 'img') { const r = await fetch(item.url); if (!r.ok) throw 0; return await r.blob(); }
+    if (item.kind === 'docx') {
+      if (!item.loaded) await loadNewsBody(item, box);
+      const im = box.querySelector('img'); if (!im || !im.src) return null;
+      const r = await fetch(im.src); return r.ok ? await r.blob() : null;
+    }
+  } catch (e) {}
+  return null;
+}
+async function shareNews(item, box, btn) {
+  const label = btn.lastChild.textContent; btn.disabled = true; btn.lastChild.textContent = ' Preparing…';
+  try {
+    const link = siteLink() || item.url;
+    const text = item.title + '\n\n' + link;
+    const blob = await newsPhotoBlob(item, box);
+    let file = null;
+    if (blob && /^image\//.test(blob.type)) {
+      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace('svg+xml', 'svg');
+      file = new File([blob], (item.title || 'update').replace(/[^\w\u0900-\u097F -]+/g, '').trim().slice(0, 40).replace(/\s+/g, '-') + '.' + ext, { type: blob.type });
+    }
+    if (navigator.share) {
+      try {
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: item.title, text }); return; }
+        await navigator.share({ title: item.title, text }); return;
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    // Fallback: WhatsApp text + link (photo cannot be attached from a web page here)
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  } finally { btn.disabled = false; btn.lastChild.textContent = label; }
+}
 async function renderNews(force) {
   const l = $('newsList'); newsMessage('Loading updates…');
   try {
@@ -1166,7 +1205,11 @@ async function renderNews(force) {
       const body = document.createElement('div'); body.className = 'nb';
       const foot = document.createElement('div'); foot.className = 'nf';
       const a = document.createElement('a'); a.href = it.url; a.textContent = it.kind === 'docx' ? 'Download the Word file' : it.kind === 'img' ? 'Open the full image' : it.kind === 'pdf' ? 'Open the PDF' : 'Download the file'; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      foot.appendChild(a);
+      const sb = document.createElement('button'); sb.type = 'button'; sb.className = 'nshare'; sb.setAttribute('aria-label', 'Share ' + it.title);
+      sb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
+      sb.appendChild(document.createTextNode(' Share'));
+      sb.onclick = () => shareNews(it, body, sb);
+      foot.append(sb, a);
       det.append(sum, body, foot);
       det.addEventListener('toggle', () => { if (det.open && !it.loaded) loadNewsBody(it, body); });
       l.appendChild(det);
