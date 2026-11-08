@@ -2,6 +2,6 @@
   "name": "ghanaugarh-updates",
   "private": true,
   "description": "Builds one static, shareable page per file in /updates",
-  "scripts": { "build:updates": "node scripts/build-updates.js" },
+  "scripts": { "build:updates": "node build-updates.js" },
   "dependencies": { "mammoth": "1.8.0", "sanitize-html": "2.13.0" }
 }
