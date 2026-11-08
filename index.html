@@ -292,7 +292,7 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
 
 <nav class="pop menu glass" id="menu" aria-label="Main menu">
   <button class="mi" id="mHome"><svg class="ic" viewBox="0 0 24 24"><use href="#i-home"/></svg>Home</button>
-  <button class="mi" id="newsBtn"><svg class="ic" viewBox="0 0 24 24"><use href="#i-news"/></svg>Updates<i class="mdot" id="mUpdDot" hidden></i></button>
+  <a class="mi" id="newsBtn" href="update.html"><svg class="ic" viewBox="0 0 24 24"><use href="#i-news"/></svg>Updates<i class="mdot" id="mUpdDot" hidden></i></a>
   <a class="mi" id="blogBtn" href="blog.html"><svg class="ic" viewBox="0 0 24 24"><use href="#i-blog"/></svg>Blog<i class="mdot" id="mBlogDot" hidden></i></a>
   <button class="mi" id="mDl" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24"><use href="#i-down"/></svg>Download<svg class="ic chev" viewBox="0 0 24 24"><use href="#i-chev"/></svg></button>
   <div class="sub" id="dlSub" hidden>
@@ -415,17 +415,6 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
     <div class="bars" id="stBars"></div>
     <h3 style="margin:16px 0 0;font-size:13px;color:var(--muted)">Largest branches <small>(click to open)</small></h3>
     <ul class="top" id="stTop"></ul>
-  </div>
-</dialog>
-
-<!-- Updates & news -->
-<dialog id="newsDlg" class="wide" aria-labelledby="nwT">
-  <div class="dlg">
-    <button class="x" data-close aria-label="Close">×</button>
-    <h2 id="nwT">Latest updates &amp; news</h2>
-    <p class="sub" id="nwSub">Notices and news from the family record keeper.</p>
-    <div id="newsList" aria-live="polite"></div>
-    <div class="row"><button class="btn" id="newsRefresh">Refresh</button><button class="btn" data-close>Close</button></div>
   </div>
 </dialog>
 
@@ -762,7 +751,7 @@ async function copyText(txt, ok) {
   try { await navigator.clipboard.writeText(txt); toast(ok); }
   catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast(ok); } catch (_) { toast('Copy not supported here'); } ta.remove(); }
 }
-$('pLink').onclick = () => { if (selected) copyText(location.href.split('#')[0] + '#p=' + (pathOf(selected) || 'r'), 'Link copied'); };
+$('pLink').onclick = () => { if (selected) copyText(location.origin + location.pathname.replace(/index\.html?$/i, '') + '#p=' + (pathOf(selected) || 'r'), 'Link copied'); };
 $('pCopy').onclick = () => { if (selected) copyText(lineageNames(selected).join(' → '), 'Lineage copied'); };
 $('pMark').onclick = () => { if (!selected) return; markA = markA === selected ? null : selected; toast(markA ? 'Person A marked. Open another person.' : 'Person A cleared'); select(selected); };
 
@@ -844,7 +833,7 @@ function refreshNotif() { $('bellDot').hidden = !(NOTIF.upd || NOTIF.blog); $('m
 function renderNotif() {
   const l = $('notifList'); l.textContent = '';
   const item = (tag, icon, title, sub) => { const el = document.createElement(tag); el.className = 'mi'; el.innerHTML = `<svg class="ic" viewBox="0 0 24 24"><use href="#i-${icon}"/></svg><span>${title}<small>${sub}</small></span><i class="mdot"></i>`; return el; };
-  if (NOTIF.upd) { const b = item('button', 'news', 'New update posted', 'Tap to read'); b.onclick = () => { closePops(); $('newsDlg').showModal(); renderNews(false); }; l.appendChild(b); }
+  if (NOTIF.upd) { const b = item('a', 'news', 'New update posted', 'Tap to read'); b.href = 'update.html'; l.appendChild(b); }
   if (NOTIF.blog) { const a = item('a', 'blog', 'New blog post', 'Tap to open the blog'); a.href = 'blog.html'; a.onclick = markBlogSeen; l.appendChild(a); }
   if (!NOTIF.upd && !NOTIF.blog) { const p = document.createElement('p'); p.className = 'none'; p.textContent = 'No new notifications.'; l.appendChild(p); }
 }
@@ -1067,7 +1056,6 @@ function showSendProblem(st, data, body, reason, submitted) {
 const UPDATES = { owner: 'ZapRathore', repo: 'ghanaugarh', folder: 'updates' };
 const NEWS_EXT = /\.(docx|jpe?g|png|gif|webp|bmp|svg|pdf|txt)$/i;
 const IMG_EXT = /\.(jpe?g|png|gif|webp|bmp|svg)$/i;
-const MAMMOTH_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js', 'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js'];
 function updatesSource() {
   let o = UPDATES.owner, r = UPDATES.repo; const h = location.hostname;
   if (!o && h.endsWith('.github.io')) o = h.split('.')[0];
@@ -1099,132 +1087,6 @@ async function fetchNews(force) {
 }
 const newsSig = items => items.map(i => i.sha).join('|');
 function newsSeen(v) { try { if (v === undefined) return localStorage.getItem('rathore-news-seen'); localStorage.setItem('rathore-news-seen', v); } catch (e) {} return null; }
-function sanitizeHtml(html) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  doc.querySelectorAll('script,style,iframe,object,embed,link,meta,form,svg').forEach(e => e.remove());
-  doc.body.querySelectorAll('*').forEach(el => {
-    [...el.attributes].forEach(a => {
-      const n = a.name.toLowerCase(), v = a.value.trim();
-      if (n.startsWith('on') || n === 'style') el.removeAttribute(a.name);
-      else if (n === 'href' && !/^(https?:|mailto:|tel:|#)/i.test(v)) el.removeAttribute(a.name);
-      else if (n === 'src' && !/^(data:image\/(png|jpe?g|gif|webp);|https:)/i.test(v)) el.removeAttribute(a.name);
-    });
-    if (el.tagName === 'A') { el.target = '_blank'; el.rel = 'noopener noreferrer'; }
-  });
-  return doc.body.innerHTML;
-}
-function loadScript(src) { return new Promise((ok, no) => { const t = document.createElement('script'); t.src = src; t.onload = ok; t.onerror = no; document.head.appendChild(t); }); }
-let mammothP = null;
-function loadMammoth() {
-  if (window.mammoth) return Promise.resolve();
-  return mammothP || (mammothP = loadScript(MAMMOTH_URLS[0]).catch(() => loadScript(MAMMOTH_URLS[1])).catch(e => { mammothP = null; throw e; }));
-}
-async function loadNewsBody(item, box) {
-  box.textContent = 'Loading…';
-  try {
-    if (item.kind === 'img') {
-      const im = document.createElement('img'); im.alt = item.title; im.loading = 'lazy';
-      im.onload = () => { item.loaded = true; };
-      im.onerror = () => { box.innerHTML = '<p class="muted">Could not open this image here. Please use the download link below.</p>'; };
-      im.src = item.url; box.textContent = ''; box.appendChild(im); return;
-    }
-    if (item.kind === 'pdf') {
-      const fr = document.createElement('iframe'); fr.src = item.url; fr.title = item.title;
-      fr.style.cssText = 'width:100%;height:70vh;border:1px solid var(--stroke);border-radius:8px;background:#fff';
-      box.textContent = ''; box.appendChild(fr); item.loaded = true; return;
-    }
-    if (item.kind === 'txt') {
-      const r = await fetch(item.url); if (!r.ok) throw new Error('file');
-      const pre = document.createElement('div'); pre.style.whiteSpace = 'pre-wrap'; pre.textContent = await r.text();
-      box.textContent = ''; box.appendChild(pre); item.loaded = true; return;
-    }
-    await loadMammoth();
-    const r = await fetch(item.url); if (!r.ok) throw new Error('file');
-    const out = await mammoth.convertToHtml({ arrayBuffer: await r.arrayBuffer() });
-    box.innerHTML = sanitizeHtml(out.value) || '<p class="muted">This document is empty.</p>';
-    box.querySelectorAll('table').forEach(t => { const w = document.createElement('div'); w.className = 'tw'; t.replaceWith(w); w.appendChild(t); });
-    item.loaded = true;
-  } catch (e) { box.innerHTML = '<p class="muted">Could not open this file here. Please use the download link below.</p>'; }
-}
-function newsMessage(text, small) {
-  const l = $('newsList'); l.textContent = '';
-  const d = document.createElement('div'); d.className = 'news-msg'; d.textContent = text;
-  if (small) { const sm = document.createElement('small'); sm.textContent = small; d.appendChild(sm); }
-  l.appendChild(d);
-}
-
-// ---- Share an update: photo + text + link ----
-function siteLink() { return /^https?:$/.test(location.protocol) ? location.href.split('#')[0] : ''; }
-async function newsPhotoBlob(item, box) {
-  try {
-    if (item.kind === 'img') { const r = await fetch(item.url); if (!r.ok) throw 0; return await r.blob(); }
-    if (item.kind === 'docx') {
-      if (!item.loaded) await loadNewsBody(item, box);
-      const im = box.querySelector('img'); if (!im || !im.src) return null;
-      const r = await fetch(im.src); return r.ok ? await r.blob() : null;
-    }
-  } catch (e) {}
-  return null;
-}
-async function shareNews(item, box, btn) {
-  const label = btn.lastChild.textContent; btn.disabled = true; btn.lastChild.textContent = ' Preparing…';
-  try {
-    const link = siteLink() || item.url;
-    const text = item.title + '\n\n' + link;
-    const blob = await newsPhotoBlob(item, box);
-    let file = null;
-    if (blob && /^image\//.test(blob.type)) {
-      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace('svg+xml', 'svg');
-      file = new File([blob], (item.title || 'update').replace(/[^\w\u0900-\u097F -]+/g, '').trim().slice(0, 40).replace(/\s+/g, '-') + '.' + ext, { type: blob.type });
-    }
-    if (navigator.share) {
-      try {
-        if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: item.title, text }); return; }
-        await navigator.share({ title: item.title, text }); return;
-      } catch (e) { if (e && e.name === 'AbortError') return; }
-    }
-    // Fallback: WhatsApp text + link (photo cannot be attached from a web page here)
-    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
-  } finally { btn.disabled = false; btn.lastChild.textContent = label; }
-}
-async function renderNews(force) {
-  const l = $('newsList'); newsMessage('Loading updates…');
-  try {
-    const items = await fetchNews(force);
-    newsSeen(newsSig(items)); NOTIF.upd = false; refreshNotif();
-    if (!items.length) { newsMessage('No updates have been posted yet. Please check again soon.'); $('nwSub').textContent = 'Notices and news from the family record keeper.'; return; }
-    $('nwSub').textContent = items.length + (items.length === 1 ? ' update' : ' updates') + ', newest first.';
-    l.textContent = '';
-    items.forEach((it, i) => {
-      const det = document.createElement('details'); det.className = 'news-item';
-      const sum = document.createElement('summary');
-      const t = document.createElement('span'); t.className = 'nt'; t.textContent = it.title;
-      const dt = document.createElement('span'); dt.className = 'nd';
-      dt.textContent = it.ts ? new Date(it.ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '';
-      sum.append(t, dt);
-      const body = document.createElement('div'); body.className = 'nb';
-      const foot = document.createElement('div'); foot.className = 'nf';
-      const a = document.createElement('a'); a.href = it.url; a.textContent = it.kind === 'docx' ? 'Download the Word file' : it.kind === 'img' ? 'Open the full image' : it.kind === 'pdf' ? 'Open the PDF' : 'Download the file'; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      const sb = document.createElement('button'); sb.type = 'button'; sb.className = 'nshare'; sb.setAttribute('aria-label', 'Share ' + it.title);
-      sb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
-      sb.appendChild(document.createTextNode(' Share'));
-      sb.onclick = () => shareNews(it, body, sb);
-      foot.append(sb, a);
-      det.append(sum, body, foot);
-      det.addEventListener('toggle', () => { if (det.open && !it.loaded) loadNewsBody(it, body); });
-      l.appendChild(det);
-      if (i === 0) det.open = true;
-    });
-  } catch (e) {
-    const code = e && e.code;
-    if (code === 'config') newsMessage('Updates are not connected yet.', 'For the site owner: host this page on GitHub Pages, or set owner and repo in the UPDATES settings in the page code.');
-    else if (code === 'nofolder') newsMessage('The updates folder was not found.', `For the site owner: create a folder named "${UPDATES.folder}" in the GitHub repository and upload .docx, .jpg, .png or .pdf files there.`);
-    else if (code === 'limit') newsMessage('GitHub is limiting requests right now. Please try again in a few minutes.');
-    else newsMessage('Could not load updates. Please check your internet connection and press Refresh.');
-  }
-}
-$('newsBtn').onclick = () => { $('newsDlg').showModal(); renderNews(false); };
-$('newsRefresh').onclick = () => renderNews(true);
 if (updatesSource()) fetchNews(false).then(items => { if (items.length && newsSig(items) !== newsSeen()) { NOTIF.upd = true; refreshNotif(); } }).catch(() => {});
 
 // ---------- Responsive layout ----------
