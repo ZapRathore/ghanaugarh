@@ -11,15 +11,15 @@
 <meta property="og:title" content="घणाऊ गढ़ वंशावली | Ghanaugarh Family Hierarchy">
 <meta property="og:description" content="Explore the Ghanaugarh family tree and lineage from Rao Bika. Search in Hindi or English.">
 <meta property="og:url" content="https://ghanaugarh.co.in/">
-<meta property="og:image" content="https://ghanaugarh.co.in/preview.jpg">
-<meta property="og:image:type" content="image/jpg">
+<meta property="og:image" content="https://ghanaugarh.co.in/ghanaugarh-social-preview.png">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="घणाऊ गढ़ वंशावली — Ghanaugarh Family Hierarchy">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="घणाऊ गढ़ वंशावली | Ghanaugarh Family Hierarchy">
 <meta name="twitter:description" content="Explore the Ghanaugarh family tree and lineage from Rao Bika.">
-<meta name="twitter:image" content="https://ghanaugarh.co.in/preview.jpg">
+<meta name="twitter:image" content="https://ghanaugarh.co.in/ghanaugarh-social-preview.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;500;600&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
@@ -246,6 +246,9 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
   body{background:#fff!important;overflow:visible}
   .bg,.topbar,.searchbar,.pop,.tools,#tip,#panel,#toast{display:none!important}
   #tree{position:static;height:96vh}
+  #tree svg{display:block;width:100%;height:96vh;margin:0 auto}
+  /* hide the Baisa chatbot icon / chat window in PDF & print */
+  [id*="baisa" i],[class*="baisa" i],[aria-label*="baisa" i],[data-print-hidden]{display:none!important;visibility:hidden!important}
 }
 </style>
 </head>
@@ -850,7 +853,7 @@ function refreshNotif() { $('bellDot').hidden = !(NOTIF.upd || NOTIF.blog); $('m
 function renderNotif() {
   const l = $('notifList'); l.textContent = '';
   const item = (tag, icon, title, sub) => { const el = document.createElement(tag); el.className = 'mi'; el.innerHTML = `<svg class="ic" viewBox="0 0 24 24"><use href="#i-${icon}"/></svg><span>${title}<small>${sub}</small></span><i class="mdot"></i>`; return el; };
-  if (NOTIF.upd) { const b = item('a', 'news', 'New update posted', 'Tap to read'); b.href = 'update.html'; l.appendChild(b); }
+  if (NOTIF.upd) { const b = item('a', 'news', 'New update posted', 'Tap to read'); b.href = 'update.html'; b.onclick = markNewsSeen; l.appendChild(b); }
   if (NOTIF.blog) { const a = item('a', 'blog', 'New blog post', 'Tap to open the blog'); a.href = 'blog.html'; a.onclick = markBlogSeen; l.appendChild(a); }
   if (!NOTIF.upd && !NOTIF.blog) { const p = document.createElement('p'); p.className = 'none'; p.textContent = 'No new notifications.'; l.appendChild(p); }
 }
@@ -1104,7 +1107,59 @@ async function fetchNews(force) {
 }
 const newsSig = items => items.map(i => i.sha).join('|');
 function newsSeen(v) { try { if (v === undefined) return localStorage.getItem('rathore-news-seen'); localStorage.setItem('rathore-news-seen', v); } catch (e) {} return null; }
-if (updatesSource()) fetchNews(false).then(items => { if (items.length && newsSig(items) !== newsSeen()) { NOTIF.upd = true; refreshNotif(); } }).catch(() => {});
+if (updatesSource()) fetchNews(false).then(items => {
+  if (!items.length) return;
+  NEWS_LATEST = newsSig(items);
+  let pending = false; try { pending = localStorage.getItem('rathore-news-pending') === '1'; } catch (e) {}
+  if (pending) { markNewsSeen(); return; }
+  recheckNotif();
+}).catch(() => {});
+
+// ---------- Print / PDF: hide Baisa icon and keep the tree centred ----------
+let _print = null;
+function printPrep() {
+  if (_print) return;
+  const bb = g.node().getBBox(), pad = 40;
+  _print = { tr: g.attr('transform'), vb: svg.attr('viewBox'), par: svg.attr('preserveAspectRatio'), hid: [] };
+  g.attr('transform', null);
+  svg.attr('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.width + pad * 2} ${bb.height + pad * 2}`).attr('preserveAspectRatio', 'xMidYMid meet');
+  // any floating widget added to the page by another script (e.g. Baisa) is hidden while printing
+  [...document.body.children].forEach(el => {
+    if (el.id === 'tree' || el.classList.contains('wm') || /^(SCRIPT|STYLE|LINK)$/.test(el.tagName)) return;
+    const pos = getComputedStyle(el).position;
+    if (pos === 'fixed' || pos === 'absolute' || /baisa/i.test(el.id + ' ' + el.className)) { el.setAttribute('data-print-hidden', ''); _print.hid.push(el); }
+  });
+}
+function printDone() {
+  if (!_print) return;
+  g.attr('transform', _print.tr);
+  _print.vb == null ? svg.attr('viewBox', null) : svg.attr('viewBox', _print.vb);
+  _print.par == null ? svg.attr('preserveAspectRatio', null) : svg.attr('preserveAspectRatio', _print.par);
+  _print.hid.forEach(el => el.removeAttribute('data-print-hidden'));
+  _print = null;
+}
+addEventListener('beforeprint', printPrep);
+addEventListener('afterprint', printDone);
+if (matchMedia) { const mq = matchMedia('print'); const h = e => e.matches ? printPrep() : printDone(); mq.addEventListener ? mq.addEventListener('change', h) : mq.addListener && mq.addListener(h); }
+
+// ---------- Bell: clear the "new update" dot once Updates has been opened ----------
+let NEWS_LATEST = null;
+const SEEN_KEYS = ['rathore-news-seen', 'rathore-news-seen-v2'];
+function newsIsSeen() { try { return SEEN_KEYS.some(k => localStorage.getItem(k) === NEWS_LATEST); } catch (e) { return false; } }
+function markNewsSeen() {
+  if (NEWS_LATEST === null) { try { localStorage.setItem('rathore-news-pending', '1'); } catch (e) {} NOTIF.upd = false; refreshNotif(); return; }
+  try { SEEN_KEYS.forEach(k => localStorage.setItem(k, NEWS_LATEST)); localStorage.removeItem('rathore-news-pending'); } catch (e) {}
+  NOTIF.upd = false; refreshNotif();
+}
+function recheckNotif() {
+  NOTIF.upd = !!(NEWS_LATEST && !newsIsSeen());
+  try { NOTIF.blog = !!(NOTIF.blogHash && localStorage.getItem('rathore-blog-seen') !== NOTIF.blogHash); } catch (e) {}
+  refreshNotif();
+}
+$('newsBtn').addEventListener('click', markNewsSeen);
+addEventListener('pageshow', recheckNotif);
+addEventListener('storage', recheckNotif);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) recheckNotif(); });
 
 // ---------- Responsive layout ----------
 function layout() { document.documentElement.style.setProperty('--hdr-b', document.querySelector('.topbar').getBoundingClientRect().bottom + 'px'); }
