@@ -18,7 +18,7 @@
     endpoint: '',                 // Cloudflare Worker URL (leave '' to use built-in FAQs only)
     avatar: base + 'baisa.jpg',   // avatar image
     side: 'right',                // 'right' or 'left'
-    bottom: 150,                  // px from bottom (kept above the tree's zoom buttons)
+    bottom: 14,                   // px from bottom (lower right corner; the tree's zoom buttons sit above it)
     lang: 'hi'                    // starting language: 'hi' or 'en'
   }, window.BAISA_CONFIG || {});
 
