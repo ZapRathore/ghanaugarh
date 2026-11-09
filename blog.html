@@ -96,5 +96,6 @@ fetch('posts.json?v=' + Date.now()).then(r => r.ok ? r.json() : []).catch(() => 
 /* same day/night theme as the main page */
 try { const t = localStorage.getItem('rathore-theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
+<script src="/baisa.js" charset="utf-8" defer></script>
 </body>
 </html>
