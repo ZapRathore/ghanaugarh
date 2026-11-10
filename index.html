@@ -237,6 +237,10 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
 .news-item .nf a{color:var(--accent)}
 .news-msg{border:1px dashed var(--stroke);border-radius:12px;padding:16px;color:var(--muted);font-size:14.5px;line-height:1.6}
 .news-msg small{display:block;margin-top:8px}
+.upb,.dnb{cursor:pointer}
+.node .upb circle,.node .dnb circle{fill:var(--accent);stroke:none;r:10px}
+.node .upb text,.node .dnb text{fill:var(--accent-ink);font-size:11px;font-weight:700;text-anchor:middle;dominant-baseline:central;pointer-events:none;stroke:none}
+.node.focusn circle{stroke:var(--gold);stroke-width:3.5}
 .wm{display:none}
 @media print{
   .wm{display:block;position:fixed;inset:0;z-index:0;pointer-events:none}
@@ -248,7 +252,7 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
   #tree{position:static;height:96vh}
   #tree svg{display:block;width:100%;height:96vh;margin:0 auto}
   /* hide the Baisa chatbot icon / chat window in PDF & print */
-  [id*="baisa" i],[class*="baisa" i],[aria-label*="baisa" i],[data-print-hidden]{display:none!important;visibility:hidden!important}
+  [id*="baisa" i],[class*="baisa" i],[aria-label*="baisa" i],[data-print-hidden],.upb,.dnb{display:none!important;visibility:hidden!important}
 }
 </style>
 </head>
@@ -261,6 +265,7 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
 <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
 <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><circle cx="12" cy="12" r="2.5"/></symbol>
 <symbol id="i-expand" viewBox="0 0 24 24"><path d="M12 22v-6M12 8V2M4 12H2M10 12H8M16 12h-2M22 12h-2M15 19l-3 3-3-3M15 5l-3-3-3 3"/></symbol>
+<symbol id="i-cascade" viewBox="0 0 24 24"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></symbol>
 <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M12 22v-6M12 8V2M4 12H2M10 12H8M16 12h-2M22 12h-2M15 19l-3-3-3 3M15 5l-3 3-3-3"/></symbol>
 <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></symbol>
 <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
@@ -348,13 +353,14 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
     <button class="btn" id="pCopy">Copy lineage</button>
     <button class="btn" id="pMark">Mark as person A</button>
   </div>
-  <div class="row"><button class="btn primary" id="pEdit">✎ Suggest change for this person</button></div>
+  <div class="row"><button class="btn" id="pLin">⇅ Show family line</button><button class="btn primary" id="pEdit">✎ Suggest change for this person</button></div>
 </aside>
 
 <div class="tools tools-l" id="toolsL" aria-label="Tree tools">
   <div class="tl-list" id="tlList">
     <button class="tbtn" id="expBtn" data-tip="Expand all" title="Expand all" aria-label="Expand all"><svg class="ic" viewBox="0 0 24 24"><use href="#i-expand"/></svg></button>
     <button class="tbtn" id="colBtn" data-tip="Collapse all" title="Collapse all" aria-label="Collapse all"><svg class="ic" viewBox="0 0 24 24"><use href="#i-collapse"/></svg></button>
+    <button class="tbtn" id="cascBtn" data-tip="Family line: ancestors ▲ / descendants ▼" title="Family line: expand ancestors and descendants one generation at a time" aria-label="Family line view" data-own aria-pressed="false"><svg class="ic" viewBox="0 0 24 24"><use href="#i-cascade"/></svg></button>
     <button class="tbtn" id="genBtn" title="Generations" aria-label="Generations shown" data-own aria-expanded="false"><svg class="ic" viewBox="0 0 24 24"><use href="#i-layers"/></svg></button>
     <button class="tbtn" id="oriBtn" data-tip="Layout" title="Layout" aria-label="Layout" data-own aria-pressed="false"><svg class="ic" viewBox="0 0 24 24"><use id="oriUse" href="#i-hier-h"/></svg></button>
     <button class="tbtn" id="clickBtn" data-tip="Click mode" title="Click mode" aria-label="Click mode" data-own aria-pressed="false"><svg class="ic" viewBox="0 0 24 24"><use href="#i-pointer"/></svg></button>
@@ -485,6 +491,15 @@ let lastNode = null, horizontal = false, colorGen = false, selected = null, mark
 const pal = () => document.documentElement.dataset.theme === 'dark' ? palDark : palLight;
 
 const root = d3.hierarchy(treeData);
+let vroot = root, fview = null;   // vroot = top person currently laid out; fview = family-line view
+// Home screen shows only generations 9, 10 and 11: a "forest" under a hidden virtual root
+const HOME_FROM = 8, HOME_TO = 11;   // depth 8 = generation 9
+let homeView = false;
+const vhome = (() => {
+  const tops = root.descendants().filter(d => d.depth === HOME_FROM);
+  if (!tops.length) return null;
+  const v = d3.hierarchy({ name: '' }); v.children = tops; v.virtual = true; return v;
+})();
 root.each(d => { if (d.children) d.children.forEach((c, i) => c.idx = i); });
 const all = root.descendants();
 all.forEach(d => d.total = d.descendants().length - 1);
@@ -526,14 +541,17 @@ function toggle(d) {
 }
 
 function update(src) {
-  tree(root);
-  const nodes = root.descendants(), links = nodes.slice(1);
+  tree(vroot);
+  const nodes = vroot.descendants().filter(d => !d.virtual), inSet = new Set(nodes), links = nodes.filter(d => inSet.has(d.parent));
   nodes.forEach(d => { d.px = horizontal ? d.y : d.x; d.py = horizontal ? d.x : d.y; });
-  const sx = src.px0 ?? src.px, sy = src.py0 ?? src.py;
+  const o = (isFinite(src.px) || isFinite(src.px0)) ? src : nodes[0];
+  const sx = o.px0 ?? o.px, sy = o.py0 ?? o.py;
 
   const node = gn.selectAll('g.node').data(nodes, d => d.id || (d.id = ++uid));
   const ne = node.enter().append('g').attr('class', 'node').attr('transform', `translate(${sx},${sy})`)
-    .on('click', (e, d) => { lastNode = d; if ($('panel').classList.contains('open')) select(d); toggle(d); setTimeout(() => ensureVisible(d), D + 80); });
+    .on('click', (e, d) => { lastNode = d; if ($('panel').classList.contains('open')) select(d);
+      if (fview && d !== fview.focus && fview.focus.ancestors().includes(d)) { fview = { focus: d, up: Math.max(0, fview.up - fview.focus.ancestors().indexOf(d)) }; applyFocus(); return; }
+      toggle(d); setTimeout(() => ensureVisible(d), D + 80); });
   ne.append('circle').attr('r', 0);
   ne.append('text').attr('class', 'cnt');
   ne.append('text').attr('class', 'lbl').text(clean);
@@ -541,7 +559,16 @@ function update(src) {
     .on('click', (e, d) => { e.stopPropagation(); lastNode = d; select(d); });
   ib.append('circle').attr('r', 10);
   ib.append('text').text('i');
+  const ub = ne.append('g').attr('class', 'upb').attr('role', 'button').attr('aria-label', 'Show one more generation of ancestors')
+    .on('click', (e, d) => { e.stopPropagation(); if (fview) { fview.up++; applyFocus(); } else if (homeView) enterFocus(d); });
+  ub.append('title').text('Show one more generation above'); ub.append('circle'); ub.append('text').text('▲');
+  const db = ne.append('g').attr('class', 'dnb').attr('role', 'button').attr('aria-label', 'Hide one generation of ancestors')
+    .on('click', (e, d) => { e.stopPropagation(); if (fview) { fview.up--; applyFocus(); } });
+  db.append('title').text('Hide one generation above'); db.append('circle'); db.append('text').text('▼');
   const nu = ne.merge(node);
+  nu.select('.upb').attr('transform', horizontal ? 'translate(-34,0)' : 'translate(0,-34)').style('display', d => (fview && d === vroot && d.parent) || (!fview && homeView && d.depth === HOME_FROM) ? null : 'none');
+  nu.select('.dnb').attr('transform', horizontal ? 'translate(-34,26)' : 'translate(-26,-34)').style('display', d => fview && d === vroot && fview.up > 0 ? null : 'none');
+  nu.classed('focusn', d => !!fview && d === fview.focus);
   nu.classed('collapsed', d => !!d._children).classed('root', d => !d.parent);
   nu.transition().duration(D).attr('transform', d => `translate(${d.px},${d.py})`);
   nu.select('circle').transition().duration(D).attr('r', d => d._children ? 13 : 9);
@@ -556,13 +583,13 @@ function update(src) {
     .attr('x', d => horizontal ? (d._children ? 22 : 18) : 0)
     .attr('y', d => horizontal ? 0 : (d._children ? 32 : 28))
     .attr('dy', horizontal ? '.32em' : 0);
-  node.exit().transition().duration(D).attr('transform', `translate(${src.px},${src.py})`).remove();
+  node.exit().transition().duration(D).attr('transform', `translate(${o.px},${o.py})`).remove();
 
   const gen = (horizontal ? d3.linkHorizontal() : d3.linkVertical()).x(d => d.px).y(d => d.py);
   const link = gl.selectAll('path.link').data(links, d => d.id);
   const le = link.enter().append('path').attr('class', 'link').attr('d', () => gen({ source: { px: sx, py: sy }, target: { px: sx, py: sy } }));
   le.merge(link).transition().duration(D).attr('d', d => gen({ source: d.parent, target: d }));
-  link.exit().transition().duration(D).attr('d', () => gen({ source: { px: src.px, py: src.py }, target: { px: src.px, py: src.py } })).remove();
+  link.exit().transition().duration(D).attr('d', () => gen({ source: { px: o.px, py: o.py }, target: { px: o.px, py: o.py } })).remove();
 
   nodes.forEach(d => { d.px0 = d.px; d.py0 = d.py; });
   styleState();
@@ -588,7 +615,7 @@ function freeRect() {
   return { x0, x1, y0, y1: Math.max(y1, y0 + 140) };
 }
 function fit() {
-  const ns = root.descendants();
+  const ns = vroot.descendants().filter(d => !d.virtual);
   const x0 = d3.min(ns, d => d.px), x1 = d3.max(ns, d => d.px) + (horizontal ? 170 : 0);
   const y0 = d3.min(ns, d => d.py), y1 = d3.max(ns, d => d.py);
   const f = freeRect(), w = f.x1 - f.x0, h = f.y1 - f.y0;
@@ -642,7 +669,7 @@ function select(d) {
   const kids = d.children || d._children || [];
   $('pKids').textContent = kids.length;
   $('pAll').textContent = d.total;
-  $('pSib').textContent = d.parent ? (d.parent.children || d.parent._children).length - 1 : 0;
+  $('pSib').textContent = d.parent ? (d.parent._allKids || d.parent.children || d.parent._children).length - 1 : 0;
   const ol = $('pLine'); ol.textContent = '';
   d.ancestors().reverse().forEach((a, i) => {
     const li = document.createElement('li'), b = document.createElement('button');
@@ -662,6 +689,7 @@ function select(d) {
   styleState();
 }
 function focusNode(d) {
+  if (homeView && d.depth >= HOME_FROM) exitFocus(true); else fullView();
   d.ancestors().slice(1).forEach(a => { if (a._children) { a.children = a._children; a._children = null; } });
   update(root); select(d); centerOn(d);
 }
@@ -743,12 +771,12 @@ addEventListener('keydown', e => {
 });
 
 // ---------- controls ----------
-$('expBtn').onclick = () => { expandAll(root); update(root); $('lvlN').textContent = maxDepth + 1; $('level').value = maxDepth + 1; setTimeout(fit, 50); };
-$('colBtn').onclick = () => { setLevel(1); update(root); setTimeout(fit, 50); };
+$('expBtn').onclick = () => { fullView(); expandAll(root); update(root); $('lvlN').textContent = maxDepth + 1; $('level').value = maxDepth + 1; setTimeout(fit, 50); };
+$('colBtn').onclick = () => { fullView(); setLevel(1); update(root); setTimeout(fit, 50); };
 $('fitBtn').onclick = fit;
 $('zIn').onclick = () => svg.transition().duration(200).call(zoom.scaleBy, 1.3);
 $('zOut').onclick = () => svg.transition().duration(200).call(zoom.scaleBy, 1 / 1.3);
-$('level').oninput = e => { setLevel(+e.target.value); update(root); fit(); };
+$('level').oninput = e => { fullView(); setLevel(+e.target.value); update(root); fit(); };
 $('oriBtn').onclick = e => {
   horizontal = !horizontal;
   tree.nodeSize(horizontal ? [34, 260] : [150, 130]);
@@ -779,7 +807,7 @@ function setTheme(t) {
   document.documentElement.dataset.theme = t;
   $('themeUse').setAttribute('href', t === 'dark' ? '#i-sun' : '#i-moon');
   try { localStorage.setItem('rathore-theme', t); } catch (e) {}
-  if (typeof update === 'function' && root.px !== undefined) update(root);
+  if (typeof update === 'function' && all.some(d => d.px !== undefined)) update(root);
 }
 $('themeBtn').onclick = e => { const n = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; setTheme(n); toast(n === 'dark' ? 'Night mode' : 'Day mode'); };
 let saved = null; try { saved = localStorage.getItem('rathore-theme'); } catch (e) {}
@@ -828,9 +856,10 @@ $('mDl').onclick = () => { const h = $('dlSub').hidden; $('dlSub').hidden = !h; 
 $('mAbout').onclick = () => $('aboutDlg').showModal();
 
 function goHome() {
+  exitFocus(true);
   document.querySelectorAll('dialog[open]').forEach(d => d.close());
   selected = null; lastNode = null; $('panel').classList.remove('open'); document.body.classList.remove('pOpen');
-  setLevel(3); update(root); setTimeout(fit, 60);
+  showHome(); update(vroot); setTimeout(fit, 60);
 }
 $('mHome').onclick = goHome;
 
@@ -845,6 +874,42 @@ $('genBtn').onclick = e => {
     genPop.classList.add('on'); $('genBtn').setAttribute('aria-expanded', true);
   }
 };
+
+// ---------- Bidirectional family tree (done in the main tree) ----------
+function trimLine() { all.forEach(d => { if (d._allKids) { d.children = d._allKids; d._allKids = null; } }); }
+function applyFocus() {
+  trimLine();
+  const f = fview.focus, anc = f.ancestors();            // [person, parent, ..., root]
+  fview.up = Math.max(0, Math.min(fview.up, anc.length - 1));
+  for (let i = 1; i <= fview.up; i++) { const a = anc[i]; a._allKids = a.children || a._children; a.children = [anc[i - 1]]; a._children = null; }
+  vroot = anc[fview.up];
+  update(fview.up ? anc[fview.up - 1] : f);
+  setTimeout(fit, 60);
+}
+function enterFocus(d) {
+  if (!d) { toast('Tap a person first, then press this button'); return; }
+  fview = { focus: d, up: Math.min(1, d.depth) };
+  if (d._children) { d.children = d._children; d._children = null; d.children.forEach(collapseAll); }
+  document.body.classList.add('fview'); $('cascBtn').setAttribute('aria-pressed', true);
+  tlOpen(false); applyFocus();
+  toast('▲ above the top person shows one more generation of ancestors; tap a person for descendants');
+}
+function exitFocus(keep) {
+  if (!fview) return;
+  const f = fview.focus;
+  trimLine(); fview = null; vroot = homeView ? vhome : root;
+  document.body.classList.remove('fview'); $('cascBtn').setAttribute('aria-pressed', false);
+  if (keep) return;
+  showHome(); update(vroot); lastNode = f; styleState(); setTimeout(fit, 60);
+}
+function showHome() {
+  if (!vhome) { homeView = false; vroot = root; setLevel(3); return; }
+  homeView = true; vroot = vhome; setLevel(HOME_TO);
+  $('lvlN').textContent = (HOME_FROM + 1) + '–' + HOME_TO;
+}
+function fullView() { exitFocus(true); if (homeView) { homeView = false; vroot = root; } }
+$('cascBtn').onclick = e => { e.stopPropagation(); if (fview) { exitFocus(); return; } enterFocus($('panel').classList.contains('open') ? selected : (lastNode || selected)); };
+$('pLin').onclick = () => enterFocus(selected);
 
 // bell: new blog post / new update
 function hashStr(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return String(h >>> 0); }
@@ -1170,7 +1235,7 @@ compact.addEventListener('change', () => setTimeout(fit, 80));
 document.fonts && document.fonts.ready.then(layout);
 
 // ---------- Start ----------
-layout(); setLevel(3); update(root); fit(); checkBlog();
+layout(); showHome(); update(vroot); fit(); checkBlog();
 function applyHash() {
   const m = location.hash.match(/^#p=([0-9r-]*)$/);
   if (m) { const d = nodeFromPath(m[1]); if (d) setTimeout(() => focusNode(d), 300); }
