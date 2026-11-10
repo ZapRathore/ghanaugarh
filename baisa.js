@@ -406,6 +406,7 @@
     callAI(l);
   }
 
+  var keepFocus = false;
   function callAI(l) {
     busy = true; sendb.disabled = true;
     var row = showTyping();
@@ -426,7 +427,7 @@
     }).catch(function () {
       row.remove(); addMsg('bot', T[l].error);
     }).then(function () {
-      clearTimeout(timer); busy = false; sendb.disabled = false; inp.focus();
+      clearTimeout(timer); busy = false; sendb.disabled = false; if (keepFocus) inp.focus();
     });
   }
 
@@ -437,7 +438,7 @@
     launch.style.display = 'none';
     tip.style.display = 'none';
     store.set('baisa-tip', '1');
-    setTimeout(function () { inp.focus(); scrollDown(); }, 30);
+    setTimeout(scrollDown, 30);   // do not focus the input: keyboard opens only when the user taps the chat box
   }
   function closePanel() {
     panel.classList.remove('open');
@@ -449,6 +450,7 @@
   panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePanel(); });
   form.addEventListener('submit', function (e) {
     e.preventDefault();
+    keepFocus = (root.activeElement === inp);   // refocus after a reply only if the user was already typing
     var v = inp.value; inp.value = '';
     ask(v);
   });
