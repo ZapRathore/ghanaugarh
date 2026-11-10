@@ -249,7 +249,7 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
   #tree{z-index:1}
   :root[data-theme]{--bg:#fff;--bg2:#fff;--ink:#111;--accent:#1f3a68;--link:rgba(0,0,0,.4);--gold:#a8842c}
   body{background:#fff!important;overflow:visible}
-  .bg,.topbar,.searchbar,.pop,.tools,#tip,#panel,#toast{display:none!important}
+  .bg,.topbar,.searchbar,.pop,.tools,#tip,#panel,#toast,#readmeDlg{display:none!important}
   #tree{position:static;height:96vh}
   #tree svg{display:block;width:100%;height:96vh;margin:0 auto}
   /* hide the Baisa chatbot icon / chat window in PDF & print */
@@ -462,6 +462,25 @@ dialog.wide{width:min(780px,calc(100vw - 24px))}
       <p>The site is updated regularly. The Updates and Blog sections carry new entries, corrections, and stories of the family's history and traditions. To suggest a correction or add a record, please use Menu → Request. Submissions are reviewed before they are added to the tree.</p>
       <p>We invite family members to explore, verify, and contribute to this record, so that it remains a faithful and living account of who we are and where we come from.</p>
     </div>
+  </div>
+</dialog>
+
+<!-- Welcome / README (shows once per visitor) -->
+<dialog id="readmeDlg" aria-labelledby="rmT">
+  <div class="dlg">
+    <button class="x" data-close aria-label="बंद करें">×</button>
+    <h2 id="rmT">🙏 स्वागत है, पधारिए!</h2>
+    <p class="sub">घणाऊ गढ़ वंशावली में आपका हार्दिक स्वागत है।</p>
+    <div style="line-height:1.75;font-size:15px">
+      <p style="margin:0 0 10px">यह हमारे परिवार की वंश-परंपरा को सहेजने का एक छोटा-सा प्रयास है। नाम पर टैप करके शाखा खोलें, पूर्वजों को ऊपर और वंशजों को नीचे देखें। ⓘ बटन से व्यक्ति का विवरण मिलेगा, और खोज (लेंस) से हिंदी या अंग्रेज़ी में नाम ढूँढ सकते हैं।</p>
+      <div style="border:1px solid var(--stroke);border-left:4px solid var(--gold);border-radius:10px;padding:12px 14px;margin:0 0 14px;background:var(--bg)">
+        <b>🙏 क्षमा-याचना व निवेदन</b>
+        <p style="margin:6px 0 0">वंशावली तैयार करते समय किसी नाम, रिश्ते, वर्तनी या जानकारी में कोई भूल-चूक रह गई हो, या कोई नाम छूट गया हो, तो हम हृदय से क्षमा चाहते हैं। यह सब अनजाने में हुआ है।</p>
+        <p style="margin:6px 0 0">आपसे विनम्र निवेदन है कि जो भी त्रुटि दिखे, उसे सुधारने में हमारी मदद करें। <b>मेनू → Request</b> पर जाकर सही जानकारी भेज दें। आपका सहयोग इस वंशावली को सही और पूरा बनाएगा। प्रत्येक अनुरोध की समीक्षा के बाद ही उसे वंश-वृक्ष में जोड़ा जाता है।</p>
+      </div>
+      <p style="margin:0 0 16px;color:var(--muted);font-size:13.5px">नई जानकारी के लिए 🔔 घंटी देखें, और सहायता के लिए “बैसा” चैटबॉट से पूछें। आपका बहुत-बहुत धन्यवाद।</p>
+    </div>
+    <button id="readmeOk" type="button" style="width:100%;padding:12px 14px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font:600 16px/1 inherit;font-family:inherit;cursor:pointer">धन्यवाद, आगे बढ़ें</button>
   </div>
 </dialog>
 
@@ -1249,6 +1268,22 @@ function applyHash() {
   if (m) { const d = nodeFromPath(m[1]); if (d) setTimeout(() => focusNode(d), 300); }
 }
 applyHash(); addEventListener('hashchange', applyHash);
+</script>
+<script>
+// ---------- Welcome note: shown once per visitor ----------
+(function () {
+  var KEY = 'ghanaugarh_readme_seen_v2';
+  var dlg = document.getElementById('readmeDlg');
+  if (!dlg || typeof dlg.showModal !== 'function') return;
+  var seen = false;
+  try { seen = localStorage.getItem(KEY) === '1'; } catch (e) {}
+  if (seen) return;
+  function remember() { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
+  dlg.addEventListener('close', remember);
+  document.getElementById('readmeOk').addEventListener('click', function () { dlg.close(); });
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+  setTimeout(function () { if (!dlg.open) dlg.showModal(); }, 600);
+})();
 </script>
 <script src="/baisa.js" charset="utf-8" defer></script>
 </body>
