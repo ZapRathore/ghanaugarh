@@ -229,6 +229,8 @@
     'font-family:system-ui,-apple-system,"Segoe UI","Noto Sans Devanagari","Mukta",Roboto,sans-serif;color:var(--ink);line-height:1.5}' +
     '.wrap[data-theme="dark"]{--panel:#0B1214;--surface:#10191C;--ink:#E6F0F2;--muted:#9BB0B6;--line:#25383E;--bot:#17252A;--user:#0E6A7E;--user-ink:#FFFFFF;--chip:#17323A;--chip-ink:#BFE6EE}' +
     'button{font:inherit;color:inherit;cursor:pointer}' +
+    'img{-webkit-touch-callout:none;-webkit-user-drag:none;user-drag:none;-webkit-user-select:none;user-select:none;pointer-events:none}' +
+    '.launch,.head img,.row img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}' +
     'button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}' +
 
     '.launch{position:fixed;z-index:2147483000;width:68px;height:68px;padding:0;border:3px solid var(--gold);border-radius:50%;background:var(--surface);overflow:hidden;box-shadow:0 6px 18px rgba(7,80,98,.35)}' +
@@ -282,9 +284,9 @@
   root.innerHTML =
     '<style>' + CSS + '</style>' +
     '<div class="wrap">' +
-      '<button class="launch" type="button"><img alt=""></button>' +
+      '<button class="launch" type="button"><img alt="" draggable="false"></button>' +
       '<section class="panel" role="dialog" aria-label="Baisa">' +
-        '<div class="head"><img alt="">' +
+        '<div class="head"><img alt="" draggable="false">' +
           '<div class="who"><b></b><span></span></div>' +
           '<button class="hbtn tgl" type="button"></button>' +
           '<button class="hbtn cls" type="button" aria-label="">✕</button>' +
@@ -316,6 +318,15 @@
 
   var history = [], busy = false, started = false;
 
+  /* Hide the "Save image / Download image" menu on right-click and long-press */
+  function blockImg(e) {
+    var t = e.target;
+    if (t && (t.tagName === 'IMG' || (t.closest && t.closest('.launch')))) e.preventDefault();
+  }
+  root.addEventListener('contextmenu', blockImg);
+  root.addEventListener('dragstart', blockImg);
+  launch.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
   function applyLang() {
     var t = T[lang];
     $('.who b').textContent = t.title;
@@ -336,7 +347,7 @@
     var row = document.createElement('div');
     row.className = 'row ' + role;
     if (role === 'bot') {
-      var im = document.createElement('img'); im.alt = ''; im.src = CFG.avatar; row.appendChild(im);
+      var im = document.createElement('img'); im.alt = ''; im.draggable = false; im.src = CFG.avatar; row.appendChild(im);
     }
     var m = document.createElement('div');
     m.className = 'msg';
@@ -363,7 +374,7 @@
   function showTyping() {
     var row = document.createElement('div');
     row.className = 'row bot';
-    row.innerHTML = '<img alt=""><div class="msg"><span class="dots"><i></i><i></i><i></i></span></div>';
+    row.innerHTML = '<img alt="" draggable="false"><div class="msg"><span class="dots"><i></i><i></i><i></i></span></div>';
     row.querySelector('img').src = CFG.avatar;
     row.querySelector('.msg').setAttribute('aria-label', T[lang].typing);
     log.appendChild(row); scrollDown();
